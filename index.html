@@ -50,6 +50,18 @@
             padding: 0.75rem 0.25rem;
             text-align: center;
         }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body>
@@ -58,7 +70,8 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect } = React;
 
-        const extraNames = { cream: '鮮奶油', bag: '加購提袋', receipt: '手開收據', sugar: '加糖粉', fork: '加叉子' };
+        const extraNames = { cream: '不加鮮奶油', bag: '加購提袋', receipt: '手開收據', sugar: '不加糖粉', fork: '加叉子' };
+        const cardNames = { none: '不需要', birthday: '生日卡', xmas: '聖誕卡' };
         const bankInfo = { bankName: "中國信託 (822)", accountName: "彭永翔", accountNumber: "1755 4046 3472" };
         const storeAddress = "桃園市桃園區文中二路25巷22號";
         const officialLineUrl = "https://lin.ee/jCQGkr1";
@@ -108,7 +121,11 @@
                 copy: <g><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g>,
                 clock: <g><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></g>,
                 pin: <g><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></g>,
-                info: <g><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></g>
+                info: <g><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></g>,
+                gift: <g><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></g>,
+                calendar: <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></g>,
+                chevron: <polyline points="9 18 15 12 9 6" />,
+                truck: <g><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><path d="M16 8h4l4 4v5h-8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></g>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -120,29 +137,68 @@
         const App = () => {
             const [order, setOrder] = useState({
                 name: '', phone: '', address: '', unitName: '', taxId: '', pickupTime: '',
-                deliveryMethod: '自取', paymentMethod: '店內結帳',
+                deliveryMethod: '自取', paymentMethod: '店內結帳', cardType: 'none',
                 items: [], extras: { cream: false, bag: true, receipt: false, sugar: false, fork: false }, note: ''
             });
             const [category, setCategory] = useState('現烤外帶8入');
             const [showConfirm, setShowConfirm] = useState(false);
             const [message, setMessage] = useState(null); 
+            const [showTimePicker, setShowTimePicker] = useState(false);
 
-            // 計算包裝與福利
+            const dateOptions = useMemo(() => {
+                const dates = [];
+                for (let i = 0; i < 14; i++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() + i);
+                    const label = i === 0 ? "今天" : i === 1 ? "明天" : `${d.getMonth() + 1}/${d.getDate()}`;
+                    const weekday = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+                    const fullDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    dates.push({ label, weekday, fullDate, index: i });
+                }
+                return dates;
+            }, []);
+
+            const timeOptions = useMemo(() => {
+                const times = [];
+                for (let h = 10; h <= 19; h++) {
+                    times.push(`${String(h).padStart(2, '0')}:00`);
+                    if (h < 19) times.push(`${String(h).padStart(2, '0')}:30`);
+                }
+                return times;
+            }, []);
+
+            const [selectedDate, setSelectedDate] = useState(dateOptions[0].fullDate);
+            const [selectedTime, setSelectedTime] = useState("");
+
+            // 核心智慧包裝邏輯
             const packing = useMemo(() => {
                 let large = 0, small = 0;
                 order.items.forEach(i => {
+                    // 根據產品內容區分大小盒
                     if (i.id.includes('8_')) large += i.qty;
                     else if (i.id.includes('4_')) small += i.qty;
                 });
+                
                 let b6 = 0, b4 = 0;
                 let tL = large, tS = small;
-                while (tL >= 9 || tS >= 12) { b6++; tL = Math.max(0, tL - 9); tS = Math.max(0, tS - 12); }
-                while (tL > 0 || tS > 0) { b4++; tL = Math.max(0, tL - 5); tS = Math.max(0, tS - 6); }
+                
+                // 智慧分配算法：優先填滿 6 杯袋 (可放 9 個 8入 或 12 個 4入)
+                while (tL >= 9 || tS >= 12) { 
+                    b6++; 
+                    tL = Math.max(0, tL - 9); 
+                    tS = Math.max(0, tS - 12); 
+                }
+                // 剩下的小散單分配到 4 杯袋 (可放 5 個 8入 或 6 個 4入)
+                while (tL > 0 || tS > 0) { 
+                    b4++; 
+                    tL = Math.max(0, tL - 5); 
+                    tS = Math.max(0, tS - 6); 
+                }
+                
                 const hasVacuum = order.items.some(i => i.vType);
                 return { b6, b4, cooler: hasVacuum ? 1 : 0 };
             }, [order.items]);
 
-            // 計算「雙色4入」與「綜合」的總盒數
             const limitItemsQty = useMemo(() => {
                 return order.items
                     .filter(i => i.minLimit)
@@ -166,6 +222,15 @@
                 }
             };
 
+            const handleUpdateQty = (id, newQty) => {
+                const qty = parseInt(newQty) || 0;
+                if (qty <= 0) {
+                    setOrder({ ...order, items: order.items.filter(it => it.id !== id) });
+                } else {
+                    setOrder({ ...order, items: order.items.map(it => it.id === id ? { ...it, qty } : it) });
+                }
+            };
+
             const validateAndShowConfirm = () => {
                 if (!order.name.trim()) { setMessage("請填寫您的【姓名】"); return; }
                 if (!order.phone.trim()) { setMessage("請填寫您的【聯絡電話】"); return; }
@@ -183,10 +248,19 @@
                 let itemsText = order.items.map(i => `• ${i.label} x ${i.qty} = $${i.price * i.qty}`).join('\n');
                 let extrasArr = Object.entries(order.extras).filter(([k,v]) => v && k !== 'bag').map(([k]) => extraNames[k]);
                 let extras = extrasArr.join('、');
-                let bagText = order.extras.bag ? `\n• 提袋($2) x ${packing.b6 + packing.b4} = $${(packing.b6 + packing.b4) * 2}` : '';
-                let coolerText = packing.cooler > 0 ? `\n🎁 贈送保冷袋 x ${packing.cooler} 個` : '';
                 
-                const text = `【華夫格格 - 預約下單】\n客戶：${order.name}\n單位：${order.unitName || '無'}\n電話：${order.phone}\n預約時間：${order.pickupTime.replace('T', ' ')}\n配送方式：${order.deliveryMethod}\n付款方式：${order.paymentMethod}\n${order.address ? '地址：'+order.address : (order.deliveryMethod === '自取' ? '店取：' + storeAddress : '')}\n--------------------\n${itemsText}${extras ? '\n• 加購：' + extras : ''}${order.taxId ? '\n• 統編：' + order.taxId : ''}${bagText}${coolerText}\n--------------------\n💰 總金額：$ ${totalAmount}\n備註：${order.note || '無'}\n\n已成功複製，回傳 LINE 即可完成預定。`;
+                // 智慧提袋複製文字
+                let bagText = "";
+                if (order.extras.bag && (packing.b6 > 0 || packing.b4 > 0)) {
+                    bagText = `\n--------------------\n【提袋費用 $2/個】`;
+                    if (packing.b6 > 0) bagText += `\n• 6杯袋 x ${packing.b6} = $${packing.b6 * 2}`;
+                    if (packing.b4 > 0) bagText += `\n• 4杯袋 x ${packing.b4} = $${packing.b4 * 2}`;
+                }
+                
+                let coolerText = packing.cooler > 0 ? `\n• 🎁 真空包贈送保冷袋 x ${packing.cooler} 個` : '';
+                let cardText = order.cardType !== 'none' ? `\n• 裝飾小卡：${cardNames[order.cardType]}` : '';
+                
+                const text = `【華夫格格 - 預約下單】\n客戶：${order.name}\n單位：${order.unitName || '無'}\n電話：${order.phone}\n預約時間：${order.pickupTime.replace('T', ' ')}\n配送方式：${order.deliveryMethod}\n付款方式：${order.paymentMethod}\n${order.address ? '地址：'+order.address : (order.deliveryMethod === '自取' ? '店取：' + storeAddress : '')}\n--------------------\n${itemsText}${extras ? '\n• 加購：' + extras : ''}${cardText}${order.taxId ? '\n• 統編：' + order.taxId : ''}${bagText}${coolerText}\n--------------------\n💰 總金額：$ ${totalAmount}\n備註：${order.note || '無'}\n\n已成功複製，回傳 LINE 即可完成預定。`;
                 
                 const t = document.createElement("textarea");
                 t.value = text;
@@ -229,6 +303,42 @@
                         </div>
                     )}
 
+                    {showTimePicker && (
+                        <div className="fixed inset-0 z-[80] modal-overlay flex items-end justify-center p-0 animate-fade">
+                            <div className="bg-white w-full rounded-t-[3rem] shadow-2xl overflow-hidden max-w-2xl border-t border-[#F5EBE0]">
+                                <div className="p-8 space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h3 className="text-2xl font-black text-[#8E7D6F]">預約配送時間</h3>
+                                            <p className="text-xs text-gray-400 font-bold mt-1">請選擇預計取貨或送達的時段</p>
+                                        </div>
+                                        <button onClick={() => setShowTimePicker(false)} className="bg-[#FDF8F5] p-3 rounded-full text-[#D5BDAF] btn-active"><Icon name="close" size={24} /></button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <p className="text-xs font-black text-[#D5BDAF] uppercase tracking-widest flex items-center gap-2"><Icon name="calendar" size={14}/> 選擇日期</p>
+                                        <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
+                                            {dateOptions.map(d => (
+                                                <button key={d.fullDate} onClick={() => setSelectedDate(d.fullDate)} className={`flex-shrink-0 w-20 py-4 rounded-3xl flex flex-col items-center justify-center transition-all border-2 ${selectedDate === d.fullDate ? 'bg-[#8E7D6F] border-[#8E7D6F] text-white' : 'bg-white border-[#FDF8F5] text-[#8E7D6F]'}`}>
+                                                    <span className="text-[10px] font-black mb-1">週{d.weekday}</span>
+                                                    <span className="text-lg font-black">{d.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-xs font-black text-[#D5BDAF] uppercase tracking-widest flex items-center gap-2"><Icon name="clock" size={14}/> 選擇時段</p>
+                                        <div className="grid grid-cols-4 gap-2 max-h-[30vh] overflow-y-auto pr-2 no-scrollbar">
+                                            {timeOptions.map(t => (
+                                                <button key={t} onClick={() => setSelectedTime(t)} className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${selectedTime === t ? 'bg-[#D5BDAF] border-[#D5BDAF] text-white' : 'bg-[#F9F6F4] border-transparent text-[#8E7D6F]'}`}>{t}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { if (selectedDate && selectedTime) { setOrder({...order, pickupTime: `${selectedDate}T${selectedTime}`}); setShowTimePicker(false); } }} className={`w-full py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all btn-active ${(!selectedDate || !selectedTime) ? 'bg-gray-100 text-gray-300' : 'bg-[#8E7D6F] text-white'}`}>確認選擇</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <header className="bg-white p-10 text-center shadow-sm rounded-b-[4rem] mb-10 border-b border-[#F5EBE0]">
                         <h1 className="text-5xl font-black text-[#8E7D6F] tracking-widest mb-3">華夫格格</h1>
                         <p className="text-2xl text-[#D5BDAF] font-black tracking-widest">比利時珍珠糖鬆餅</p>
@@ -236,13 +346,12 @@
                     </header>
 
                     <main className="px-4 space-y-10 max-w-2xl mx-auto">
-                        {/* 20盒起訂門檻提醒 */}
                         {hasLimitWarning && (
                             <div className="bg-red-50 border-2 border-red-200 p-6 rounded-3xl flex items-center gap-5 warning-pulse animate-fade shadow-sm">
                                 <Icon name="alert" size={32} className="text-red-500 flex-shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-lg font-black text-red-600 tracking-tight">訂購數量不足</p>
-                                    <p className="text-base font-bold text-red-500 opacity-90">雙色4入與綜合系列需滿 20 盒 (目前：{limitItemsQty} 盒)。</p>
+                                    <p className="text-lg font-black text-red-600">訂購盒數不足</p>
+                                    <p className="text-base font-bold text-red-500 opacity-90">雙色4入與綜合系列共需滿 20 盒 (目前僅 {limitItemsQty} 盒)。</p>
                                 </div>
                             </div>
                         )}
@@ -251,83 +360,74 @@
                             <h2 className="font-black text-[#8E7D6F] flex items-center gap-3 text-xl border-b border-[#FDF8F5] pb-4">❶ 客戶基本資料</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-3">
-                                    <p className="text-sm font-black text-[#8E7D6F] ml-1 uppercase">姓名 <span className="text-red-400">*</span></p>
+                                    <p className="text-sm font-black text-[#8E7D6F] uppercase">姓名 <span className="text-red-400">*</span></p>
                                     <input type="text" placeholder="您的稱呼" className="w-full bg-[#F9F6F4] rounded-2xl p-5 outline-none font-bold text-lg border-2 border-transparent" value={order.name} onChange={e => setOrder({...order, name: e.target.value})} />
                                 </div>
                                 <div className="space-y-3">
-                                    <p className="text-sm font-black text-[#8E7D6F] ml-1 uppercase">聯絡電話 <span className="text-red-400">*</span></p>
+                                    <p className="text-sm font-black text-[#8E7D6F] uppercase">聯絡電話 <span className="text-red-400">*</span></p>
                                     <input type="tel" placeholder="電話號碼" className="w-full bg-[#F9F6F4] rounded-2xl p-5 outline-none font-bold text-lg border-2 border-transparent" value={order.phone} onChange={e => setOrder({...order, phone: e.target.value})} />
                                 </div>
                             </div>
-                            
-                            <div className="bg-[#F9F6F4] rounded-[2rem] p-6 space-y-3">
-                                <p className="text-sm text-[#8E7D6F] font-black flex items-center gap-2 uppercase"><Icon name="clock" size={16}/> 預約取貨 / 配送時間 <span className="text-red-400">*</span></p>
-                                <input type="datetime-local" className="w-full bg-white rounded-xl p-4 outline-none font-bold text-lg text-[#8E7D6F] shadow-sm" value={order.pickupTime} onChange={e => setOrder({...order, pickupTime: e.target.value})} />
+                            <div className="space-y-3">
+                                <p className="text-sm font-black text-[#8E7D6F] uppercase">預約取貨 / 配送時間 <span className="text-red-400">*</span></p>
+                                <button onClick={() => setShowTimePicker(true)} className="w-full bg-[#F9F6F4] rounded-[2rem] p-6 flex items-center justify-between group btn-active border-2 border-transparent shadow-inner">
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-white p-3 rounded-2xl text-[#8E7D6F] shadow-sm"><Icon name="clock" size={24}/></div>
+                                        <div className="text-left">
+                                            <p className={`text-xl font-black ${order.pickupTime ? 'text-[#8E7D6F]' : 'text-gray-400'}`}>{order.pickupTime ? order.pickupTime.replace('T', ' ') : '點擊選擇預約時間'}</p>
+                                        </div>
+                                    </div>
+                                    <Icon name="chevron" size={20} className="text-[#D5BDAF]" />
+                                </button>
                             </div>
-
-                            <div className="flex bg-[#F9F6F4] rounded-[2rem] p-2 font-bold text-base shadow-inner">
+                            <div className="flex bg-[#F9F6F4] rounded-[2rem] p-2 font-bold shadow-inner">
                                 {['自取', '外送'].map(m => (
                                     <button key={m} onClick={() => setOrder({...order, deliveryMethod: m})} className={`flex-1 py-4 rounded-[1.5rem] transition-all ${order.deliveryMethod === m ? 'bg-[#8E7D6F] text-white shadow-lg' : 'text-[#8E7D6F]'}`}>{m}</button>
                                 ))}
                             </div>
-                            
                             {order.deliveryMethod === '自取' && (
-                                <div className="bg-orange-50 p-6 rounded-3xl border-2 border-orange-100 flex items-start gap-4 animate-fade shadow-sm">
-                                    <Icon name="pin" size={24} className="text-orange-400 mt-0.5 flex-shrink-0" />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-black text-orange-600 uppercase tracking-widest">店取地址</p>
-                                        <p className="text-lg font-bold text-orange-500 opacity-90 leading-relaxed">{storeAddress}</p>
-                                    </div>
+                                <div className="bg-orange-50 p-6 rounded-3xl border-2 border-orange-100 flex items-start gap-4 animate-fade">
+                                    <Icon name="pin" size={24} className="text-orange-400 mt-0.5" />
+                                    <div className="flex-1"><p className="text-sm font-black text-orange-600 uppercase">店取地址</p><p className="text-lg font-bold text-orange-500 opacity-90 leading-relaxed">{storeAddress}</p></div>
                                 </div>
                             )}
-
                             <div className="grid grid-cols-1 gap-6">
                                 <div className="space-y-3">
-                                    <p className="text-sm font-black text-[#8E7D6F] ml-1 uppercase">公司 / 單位名稱 (選填)</p>
+                                    <p className="text-sm font-black text-[#8E7D6F] uppercase">公司 / 單位名稱 (選填)</p>
                                     <input type="text" placeholder="單位名稱" className="w-full bg-[#F9F6F4] rounded-2xl p-5 outline-none font-bold text-lg border-2 border-transparent" value={order.unitName} onChange={e => setOrder({...order, unitName: e.target.value})} />
                                 </div>
                                 <div className="space-y-3">
-                                    <p className="text-sm font-black text-[#8E7D6F] ml-1 uppercase">詳細配送地址 {order.deliveryMethod === '外送' && <span className="text-red-400">*</span>}</p>
+                                    <p className="text-sm font-black text-[#8E7D6F] uppercase">詳細配送地址 {order.deliveryMethod === '外送' && <span className="text-red-400">*</span>}</p>
                                     <textarea placeholder={order.deliveryMethod === '自取' ? '自取免填地址' : '詳細配送地址 *'} disabled={order.deliveryMethod === '自取'} className="w-full bg-[#F9F6F4] rounded-2xl p-5 outline-none font-bold text-lg disabled:opacity-30 border-2 border-transparent min-h-[100px]" value={order.address} onChange={e => setOrder({...order, address: e.target.value})}></textarea>
                                 </div>
                             </div>
                         </section>
 
                         <section className="bg-white rounded-[3rem] p-10 shadow-md space-y-8 border border-[#F5EBE0]">
-                            <div className="flex justify-between items-center border-b border-[#FDF8F5] pb-4">
-                                <h2 className="font-black text-[#8E7D6F] text-xl">❷ 選擇口味內容</h2>
-                            </div>
-                            
+                            <h2 className="font-black text-[#8E7D6F] text-xl border-b border-[#FDF8F5] pb-4">❷ 選擇口味內容</h2>
                             <div className="category-grid font-black">
                                 {Object.keys(productCategories).map(cat => (
-                                    <button 
-                                        key={cat} 
-                                        onClick={()=>setCategory(cat)} 
-                                        className={`category-btn rounded-2xl transition-all border-2 leading-none ${category===cat?'bg-[#8E7D6F] border-[#8E7D6F] text-white shadow-md':'bg-white border-[#E3D5CA] text-[#8E7D6F]'}`}
-                                    >
+                                    <button key={cat} onClick={()=>setCategory(cat)} className={`category-btn rounded-2xl transition-all border-2 leading-none ${category===cat?'bg-[#8E7D6F] border-[#8E7D6F] text-white shadow-md' : 'bg-white border-[#E3D5CA] text-[#8E7D6F]'}`}>
                                         <span className="text-[12px] md:text-[14px] mb-1">{cat}</span>
-                                        { (cat === '雙色4入' || cat === '綜合') && <span className="mt-1 text-[8px] bg-red-100 text-red-500 px-1 rounded-full">20盒起</span>}
+                                        {(cat === '雙色4入' || cat === '綜合') && <span className="mt-1 text-[8px] bg-red-100 text-red-500 px-1 rounded-full">20盒起</span>}
                                     </button>
                                 ))}
                             </div>
-
                             <div className="grid grid-cols-1 gap-4">
                                 {productCategories[category].map(p => (
-                                    <button key={p.id} onClick={() => handleAddItem(p)} className="p-6 bg-[#F9F6F4] rounded-3xl border-2 border-transparent hover:border-[#D5BDAF] transition-all text-left relative overflow-hidden btn-active flex justify-between items-center shadow-sm">
+                                    <button key={p.id} onClick={() => handleAddItem(p)} className="p-6 bg-[#F9F6F4] rounded-3xl border-2 border-transparent hover:border-[#D5BDAF] btn-active flex justify-between items-center shadow-sm">
                                         <div className="flex-1 pr-4">
                                             {p.note && <span className="bg-[#D5BDAF] text-white text-[10px] px-3 py-1 rounded-full font-black mb-2 block w-fit shadow-sm">{p.note}</span>}
                                             <p className="text-xl font-black">{p.label}</p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-lg text-[#8E7D6F] font-black">$ {p.price}</p>
-                                        </div>
+                                        <p className="text-lg text-[#8E7D6F] font-black">$ {p.price}</p>
                                     </button>
                                 ))}
                             </div>
 
                             {order.items.length > 0 && (
                                 <div className="space-y-4 mt-6 pt-8 border-t border-dashed border-[#D5BDAF]/30 animate-fade">
-                                    <p className="text-sm font-black text-[#D5BDAF] mb-2 uppercase tracking-widest">🛒 已選擇購物清單</p>
+                                    <p className="text-sm font-black text-[#D5BDAF] mb-2 uppercase tracking-widest">🛒 已選擇購物清單 (手動輸入數量)</p>
                                     <div className="grid grid-cols-1 gap-3">
                                         {order.items.map(i => (
                                             <div key={i.id} className="flex justify-between items-center text-lg font-black bg-[#FDF8F5] p-5 rounded-3xl border border-[#F5EBE0] shadow-sm">
@@ -335,20 +435,42 @@
                                                     <span className="block">{i.label}</span>
                                                     {i.note && <span className="text-[10px] text-orange-400 font-bold">客製化預定項</span>}
                                                 </div>
-                                                <div className="flex items-center gap-6">
-                                                    <button onClick={() => setOrder({...order, items: order.items.map(it => it.id === i.id ? {...it, qty: Math.max(0, it.qty - 1)} : it).filter(it => it.qty > 0)})} className="bg-white text-[#D5BDAF] p-3 rounded-xl shadow-sm border border-[#F5EBE0]"><Icon name="minus" size={20}/></button>
-                                                    <span className="w-8 text-center text-2xl">{i.qty}</span>
-                                                    <button onClick={() => handleAddItem(i)} className="bg-white text-[#D5BDAF] p-3 rounded-xl shadow-sm border border-[#F5EBE0]"><Icon name="plus" size={20}/></button>
+                                                <div className="flex items-center gap-4">
+                                                    <button onClick={() => handleUpdateQty(i.id, i.qty - 1)} className="bg-white text-[#D5BDAF] p-3 rounded-xl shadow-sm border border-[#F5EBE0] active:scale-110"><Icon name="minus" size={20}/></button>
+                                                    <input type="number" value={i.qty} onChange={(e) => handleUpdateQty(i.id, e.target.value)} className="w-16 text-center text-2xl font-black bg-transparent border-b-2 border-[#D5BDAF]/30 focus:border-[#D5BDAF] outline-none" />
+                                                    <button onClick={() => handleUpdateQty(i.id, i.qty + 1)} className="bg-white text-[#D5BDAF] p-3 rounded-xl shadow-sm border border-[#F5EBE0] active:scale-110"><Icon name="plus" size={20}/></button>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* 智慧袋子建議區 - 當有品項時顯示 */}
+                                    {order.extras.bag && (packing.b6 > 0 || packing.b4 > 0) && (
+                                        <div className="bg-[#D5BDAF]/10 border-2 border-dashed border-[#D5BDAF] p-6 rounded-[2rem] mt-6 animate-fade shadow-inner">
+                                            <p className="text-sm font-black text-[#8E7D6F] flex items-center gap-2 uppercase mb-3 tracking-widest">
+                                                <Icon name="truck" size={16}/> 智慧包裝提袋建議
+                                            </p>
+                                            <div className="space-y-2">
+                                                {packing.b6 > 0 && <div className="flex justify-between text-base font-black"><span>專用 6 杯袋 ($2)</span><span>x {packing.b6} 個</span></div>}
+                                                {packing.b4 > 0 && <div className="flex justify-between text-base font-black"><span>專用 4 杯袋 ($2)</span><span>x {packing.b4} 個</span></div>}
+                                                <div className="text-[10px] text-[#8E7D6F] opacity-70 mt-2 font-bold leading-tight">* 根據點購產品大小自動換算，確保包裝精準。</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </section>
 
                         <section className="bg-white rounded-[3rem] p-10 shadow-md space-y-8 border border-[#F5EBE0]">
                             <h2 className="font-black text-[#8E7D6F] text-xl border-b border-[#FDF8F5] pb-4">❸ 付款與備註</h2>
+                            <div className="space-y-4 pt-2">
+                                <p className="text-sm font-black text-[#8E7D6F] flex items-center gap-2 uppercase tracking-widest"><Icon name="gift" size={16}/> 是否需要裝飾小卡 (二擇一)</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {Object.entries(cardNames).map(([k, label]) => (
+                                        <button key={k} onClick={() => setOrder({...order, cardType: k})} className={`py-3 rounded-xl border-2 font-bold text-sm transition-all ${order.cardType === k ? 'bg-[#D5BDAF] border-[#D5BDAF] text-white shadow-md' : 'bg-[#F9F6F4] border-transparent text-[#8E7D6F]'}`}>{label}</button>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-base font-black">
                                 {Object.entries(extraNames).map(([k, label]) => (
                                     <button key={k} onClick={() => setOrder({...order, extras: {...order.extras, [k]: !order.extras[k]}})} className={`p-5 rounded-3xl border-2 transition-all flex justify-between items-center ${order.extras[k] ? 'bg-[#D5BDAF] border-[#D5BDAF] text-white shadow-lg' : 'bg-[#F9F6F4] border-transparent text-[#8E7D6F]'}`}>
@@ -363,22 +485,19 @@
                                     <input type="text" placeholder="請輸入統一編號" className="w-full bg-[#F9F6F4] rounded-2xl p-5 outline-none font-bold text-lg border-2 border-transparent" value={order.taxId} onChange={e => setOrder({...order, taxId: e.target.value})} />
                                 </div>
                             )}
-                            <div className="flex bg-[#F9F6F4] rounded-[2rem] p-2 font-bold text-base shadow-inner mt-4">
+                            <div className="flex bg-[#F9F6F4] rounded-[2rem] p-2 font-bold shadow-inner mt-4">
                                 {['店內結帳', 'LinePay', '匯款'].map(m => (
                                     <button key={m} onClick={() => setOrder({...order, paymentMethod: m})} className={`flex-1 py-4 rounded-[1.5rem] transition-all ${order.paymentMethod === m ? 'bg-[#8E7D6F] text-white shadow-lg' : 'text-[#8E7D6F]'}`}>{m}</button>
                                 ))}
                             </div>
                             <div className="space-y-3 pt-4">
-                                <p className="text-sm font-black text-[#8E7D6F] ml-1 uppercase">特別備註事項</p>
+                                <p className="text-sm font-black text-[#8E7D6F] uppercase">特別備註事項</p>
                                 <textarea placeholder="是否有口感偏好或特殊配送需求？" className="w-full bg-[#F9F6F4] rounded-2xl p-5 outline-none font-bold text-lg min-h-[150px] border-2 border-transparent" value={order.note} onChange={e => setOrder({...order, note: e.target.value})}></textarea>
                             </div>
                         </section>
 
                         <div className="sticky bottom-6 z-40 px-2 py-4">
-                            <button 
-                                onClick={validateAndShowConfirm} 
-                                className="w-full bg-[#8E7D6F] text-white p-8 rounded-[3rem] font-black text-3xl shadow-2xl flex justify-between items-center px-12 btn-active active:scale-95 transition-all"
-                            >
+                            <button onClick={validateAndShowConfirm} className="w-full bg-[#8E7D6F] text-white p-8 rounded-[3rem] font-black text-3xl shadow-2xl flex justify-between items-center px-12 btn-active active:scale-95 transition-all">
                                 <span className="tracking-widest">確認預約下單</span>
                                 <span className="bg-white/20 px-6 py-2 rounded-full text-xl font-black">$ {totalAmount}</span>
                             </button>
@@ -387,23 +506,20 @@
 
                     {showConfirm && (
                         <div className="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4 animate-fade">
-                            <div className="bg-white w-full max-w-xl rounded-[4rem] overflow-hidden shadow-2xl border border-[#F5EBE0]">
+                            <div className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl border border-[#F5EBE0]">
                                 <div className="p-12 space-y-10 max-h-[85vh] overflow-y-auto no-scrollbar">
                                     <div className="text-center">
-                                        <h3 className="text-3xl font-black text-[#8E7D6F] tracking-widest">預約清單核對</h3>
-                                        <p className="text-sm opacity-40 mt-1 uppercase tracking-[0.2em] font-black">Confirmation</p>
+                                        <h3 className="text-3xl font-black text-[#8E7D6F]">預約清單核對</h3>
+                                        <p className="text-sm opacity-40 mt-1 uppercase tracking-[0.2em] font-black">Final Confirmation</p>
                                     </div>
-                                    
                                     <div className="space-y-4 text-base font-bold border-y border-dashed border-[#D5BDAF]/30 py-8 text-left">
-                                        <div className="flex justify-between items-center"><span className="opacity-50">客戶姓名</span><span className="text-lg">{order.name}</span></div>
-                                        <div className="flex justify-between items-center"><span className="opacity-50">預約時間</span><span className="text-[#8E7D6F] font-black text-lg">{order.pickupTime.replace('T',' ')}</span></div>
-                                        <div className="flex justify-between items-center"><span className="opacity-50">配送方式</span><span className="text-lg">{order.deliveryMethod}</span></div>
+                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">客戶姓名</span><span className="text-lg">{order.name}</span></div>
+                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">預約時間</span><span className="text-[#8E7D6F] font-black text-lg">{order.pickupTime.replace('T',' ')}</span></div>
+                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">裝飾小卡</span><span>{cardNames[order.cardType]}</span></div>
+                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">配送方式</span><span className="text-lg">{order.deliveryMethod}</span></div>
                                         <div className="flex justify-between items-center"><span className="opacity-50 font-black">付款方式</span><span className="text-blue-500 font-black underline underline-offset-8 text-lg">{order.paymentMethod}</span></div>
-                                        <div className="text-sm opacity-60 text-right mt-4 bg-[#F9F6F4] p-5 rounded-3xl italic border border-[#F5EBE0]">
-                                            📍 {order.deliveryMethod === '自取' ? storeAddress : order.address}
-                                        </div>
+                                        <div className="text-sm opacity-60 text-right mt-4 bg-[#F9F6F4] p-5 rounded-3xl italic border border-[#F5EBE0]">📍 {order.deliveryMethod === '自取' ? storeAddress : order.address}</div>
                                     </div>
-
                                     <div className="space-y-6">
                                         <p className="text-sm font-black text-[#D5BDAF] uppercase tracking-widest border-l-4 border-[#D5BDAF] pl-3">訂購明細內容</p>
                                         <div className="space-y-5">
@@ -416,14 +532,18 @@
                                                     <span>$ {i.price * i.qty}</span>
                                                 </div>
                                             ))}
+                                            {/* 核對清單顯示提袋資訊 */}
+                                            {order.extras.bag && (packing.b6 > 0 || packing.b4 > 0) && (
+                                                <div className="space-y-2 pt-2 border-t border-[#F5EBE0]">
+                                                    {packing.b6 > 0 && <div className="flex justify-between text-lg font-black text-gray-500"><span>• 專用 6 杯袋 x {packing.b6}</span><span>$ {packing.b6 * 2}</span></div>}
+                                                    {packing.b4 > 0 && <div className="flex justify-between text-lg font-black text-gray-500"><span>• 專用 4 杯袋 x {packing.b4}</span><span>$ {packing.b4 * 2}</span></div>}
+                                                </div>
+                                            )}
                                         </div>
                                         {packing.cooler > 0 && (
-                                            <div className="bg-blue-50 text-blue-600 p-6 rounded-3xl text-base font-black border border-blue-100 italic flex items-center gap-3 shadow-inner">
-                                                <Icon name="check" size={20}/> 真空包福利：已贈送保冷袋 x {packing.cooler}
-                                            </div>
+                                            <div className="bg-blue-50 text-blue-600 p-6 rounded-3xl text-base font-black border border-blue-100 italic flex items-center gap-3 shadow-inner"><Icon name="check" size={20}/> 真空包福利：已贈送保冷袋 x {packing.cooler}</div>
                                         )}
                                     </div>
-
                                     {(order.paymentMethod === '匯款' || order.paymentMethod === 'LinePay') && (
                                         <div className="bg-[#FDF8F5] p-8 rounded-[3rem] space-y-6 border border-[#F5EBE0] shadow-inner text-left">
                                             <p className="text-sm font-black text-[#8E7D6F] uppercase border-b border-[#D5BDAF]/20 pb-2 tracking-widest">付款與對帳資訊</p>
@@ -432,23 +552,17 @@
                                                     <div className="flex justify-between text-sm opacity-60 px-4"><span>銀行</span><span>{bankInfo.bankName}</span></div>
                                                     <div className="flex justify-between text-sm opacity-60 px-4"><span>戶名</span><span>{bankInfo.accountName}</span></div>
                                                     <p className="text-3xl tracking-tighter font-black text-[#8E7D6F] py-5 bg-white rounded-3xl border border-[#F5EBE0] shadow-sm my-4">{bankInfo.accountNumber}</p>
-                                                    <div className="text-sm text-red-500 font-black leading-relaxed bg-red-50 p-5 rounded-3xl border border-red-100 text-left">
-                                                        ⚠️ 匯款完畢後，回傳訊息時請務必提供「帳號後五碼」以便確認付款完成。
-                                                    </div>
+                                                    <div className="text-sm text-red-500 font-black bg-red-50 p-5 rounded-3xl border border-red-100 text-left">⚠️ 匯款完畢後，請回傳「帳號後五碼」以確認付款。</div>
                                                 </div>
                                             ) : (
-                                                <p className="text-lg font-black text-[#8E7D6F] leading-relaxed text-center py-4">
-                                                    LinePay 付款：下單後請於 LINE 官方帳號索取付款連結。
-                                                </p>
+                                                <p className="text-lg font-black text-[#8E7D6F] text-center py-4">LinePay 付款：下單後請於 LINE 索取付款連結。</p>
                                             )}
                                         </div>
                                     )}
                                 </div>
                                 <div className="p-8 bg-[#F9F6F4] flex gap-4 border-t border-[#F5EBE0]">
-                                    <button onClick={() => setShowConfirm(false)} className="flex-1 py-6 bg-white rounded-3xl font-black text-[#D5BDAF] border border-[#D5BDAF] text-lg btn-active shadow-sm transition-all hover:bg-gray-50">返回修改</button>
-                                    <button onClick={handleCopyAndSubmit} className="flex-[2] py-6 bg-[#8E7D6F] text-white rounded-3xl font-black shadow-lg flex items-center justify-center gap-4 text-xl btn-active transition-all">
-                                        <Icon name="copy" size={24}/> 複製內容並回傳 LINE
-                                    </button>
+                                    <button onClick={() => setShowConfirm(false)} className="flex-1 py-6 bg-white rounded-3xl font-black text-[#D5BDAF] border border-[#D5BDAF] text-lg btn-active transition-all">返回</button>
+                                    <button onClick={handleCopyAndSubmit} className="flex-[2] py-6 bg-[#8E7D6F] text-white rounded-3xl font-black shadow-lg flex items-center justify-center gap-4 text-xl btn-active transition-all"><Icon name="copy" size={24}/> 複製並回傳 LINE</button>
                                 </div>
                             </div>
                         </div>
