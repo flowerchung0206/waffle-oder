@@ -101,14 +101,14 @@
                 { id: '4_mix', label: '4入 四色綜合', price: 65, minLimit: true, note: CUSTOM_NOTE },
             ],
             '真空包': [
-                { id: 'v_40_o', label: '真空40 原味', price: 320, vType: 40, note: CUSTOM_NOTE },
-                { id: 'v_40_s', label: '真空40 草莓', price: 500, vType: 40, note: CUSTOM_NOTE },
-                { id: 'v_40_c', label: '真空40 可可', price: 385, vType: 40, note: CUSTOM_NOTE },
-                { id: 'v_40_m', label: '真空40 抹茶', price: 380, vType: 40, note: CUSTOM_NOTE },
-                { id: 'v_80_o', label: '真空80 原味', price: 550, vType: 80, note: CUSTOM_NOTE },
-                { id: 'v_80_s', label: '真空80 草莓', price: 790, vType: 80, note: CUSTOM_NOTE },
-                { id: 'v_80_c', label: '真空80 可可', price: 700, vType: 80, note: CUSTOM_NOTE },
-                { id: 'v_80_m', label: '真空80 抹茶', price: 750, vType: 80, note: CUSTOM_NOTE },
+                { id: 'v_40_o', label: '真空40 原味', price: 320, vType: 40, note: "需1天前預定" },
+                { id: 'v_40_s', label: '真空40 草莓', price: 500, vType: 40, note: "需1天前預定" },
+                { id: 'v_40_c', label: '真空40 可可', price: 385, vType: 40, note: "需1天前預定" },
+                { id: 'v_40_m', label: '真空40 抹茶', price: 380, vType: 40, note: "需1天前預定" },
+                { id: 'v_80_o', label: '真空80 原味', price: 550, vType: 80, note: "需1天前預定" },
+                { id: 'v_80_s', label: '真空80 草莓', price: 790, vType: 80, note: "需1天前預定" },
+                { id: 'v_80_c', label: '真空80 可可', price: 700, vType: 80, note: "需1天前預定" },
+                { id: 'v_80_m', label: '真空80 抹茶', price: 750, vType: 80, note: "需1天前預定" },
             ]
         };
 
@@ -125,7 +125,8 @@
                 gift: <g><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></g>,
                 calendar: <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></g>,
                 chevron: <polyline points="9 18 15 12 9 6" />,
-                truck: <g><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><path d="M16 8h4l4 4v5h-8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></g>
+                camera: <g><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></g>,
+                link: <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -138,6 +139,7 @@
             const [order, setOrder] = useState({
                 name: '', phone: '', address: '', unitName: '', taxId: '', pickupTime: '',
                 deliveryMethod: '自取', paymentMethod: '店內結帳', cardType: 'none',
+                isSecondaryOrder: false, // 續單勾選
                 items: [], extras: { cream: false, bag: true, receipt: false, sugar: false, fork: false }, note: ''
             });
             const [category, setCategory] = useState('現烤外帶8入');
@@ -170,31 +172,16 @@
             const [selectedDate, setSelectedDate] = useState(dateOptions[0].fullDate);
             const [selectedTime, setSelectedTime] = useState("");
 
-            // 核心智慧包裝邏輯
             const packing = useMemo(() => {
                 let large = 0, small = 0;
                 order.items.forEach(i => {
-                    // 根據產品內容區分大小盒
                     if (i.id.includes('8_')) large += i.qty;
                     else if (i.id.includes('4_')) small += i.qty;
                 });
-                
                 let b6 = 0, b4 = 0;
                 let tL = large, tS = small;
-                
-                // 智慧分配算法：優先填滿 6 杯袋 (可放 9 個 8入 或 12 個 4入)
-                while (tL >= 9 || tS >= 12) { 
-                    b6++; 
-                    tL = Math.max(0, tL - 9); 
-                    tS = Math.max(0, tS - 12); 
-                }
-                // 剩下的小散單分配到 4 杯袋 (可放 5 個 8入 或 6 個 4入)
-                while (tL > 0 || tS > 0) { 
-                    b4++; 
-                    tL = Math.max(0, tL - 5); 
-                    tS = Math.max(0, tS - 6); 
-                }
-                
+                while (tL >= 9 || tS >= 12) { b6++; tL = Math.max(0, tL - 9); tS = Math.max(0, tS - 12); }
+                while (tL > 0 || tS > 0) { b4++; tL = Math.max(0, tL - 5); tS = Math.max(0, tS - 6); }
                 const hasVacuum = order.items.some(i => i.vType);
                 return { b6, b4, cooler: hasVacuum ? 1 : 0 };
             }, [order.items]);
@@ -205,7 +192,8 @@
                     .reduce((s, i) => s + i.qty, 0);
             }, [order.items]);
 
-            const hasLimitWarning = limitItemsQty > 0 && limitItemsQty < 20;
+            // 判斷是否顯示不足 20 盒警示：只有在「非續單」且「數量不足」時才顯示
+            const hasLimitWarning = !order.isSecondaryOrder && limitItemsQty > 0 && limitItemsQty < 20;
 
             const totalAmount = useMemo(() => {
                 const itemsSum = order.items.reduce((s, i) => s + (i.price * i.qty), 0);
@@ -238,7 +226,7 @@
                 if (order.deliveryMethod === '外送' && !order.address.trim()) { setMessage("選擇外送請填寫【配送地址】"); return; }
                 if (order.items.length === 0) { setMessage("尚未選擇任何【產品】"); return; }
                 if (hasLimitWarning) {
-                    setMessage(`雙色4入及綜合系列目前共點購 ${limitItemsQty} 盒，還差 ${20-limitItemsQty} 盒才能成立訂單喔！請再選購更多。`);
+                    setMessage(`雙色4入與綜合系列需滿 20 盒才可下單。如果您是分開多筆地址下單，請在「客戶基本資料」區勾選「我是續單（合併計算）」即可送出。`);
                     return;
                 }
                 setShowConfirm(true);
@@ -248,19 +236,12 @@
                 let itemsText = order.items.map(i => `• ${i.label} x ${i.qty} = $${i.price * i.qty}`).join('\n');
                 let extrasArr = Object.entries(order.extras).filter(([k,v]) => v && k !== 'bag').map(([k]) => extraNames[k]);
                 let extras = extrasArr.join('、');
-                
-                // 智慧提袋複製文字
-                let bagText = "";
-                if (order.extras.bag && (packing.b6 > 0 || packing.b4 > 0)) {
-                    bagText = `\n--------------------\n【提袋費用 $2/個】`;
-                    if (packing.b6 > 0) bagText += `\n• 6杯袋 x ${packing.b6} = $${packing.b6 * 2}`;
-                    if (packing.b4 > 0) bagText += `\n• 4杯袋 x ${packing.b4} = $${packing.b4 * 2}`;
-                }
-                
+                let bagText = order.extras.bag ? `\n• 提袋($2) x ${packing.b6 + packing.b4} = $${(packing.b6 + packing.b4) * 2}` : '';
                 let coolerText = packing.cooler > 0 ? `\n• 🎁 真空包贈送保冷袋 x ${packing.cooler} 個` : '';
                 let cardText = order.cardType !== 'none' ? `\n• 裝飾小卡：${cardNames[order.cardType]}` : '';
+                let secondaryNote = order.isSecondaryOrder ? "\n⚠️ 注意：此筆為續單/合併計算訂單" : "";
                 
-                const text = `【華夫格格 - 預約下單】\n客戶：${order.name}\n單位：${order.unitName || '無'}\n電話：${order.phone}\n預約時間：${order.pickupTime.replace('T', ' ')}\n配送方式：${order.deliveryMethod}\n付款方式：${order.paymentMethod}\n${order.address ? '地址：'+order.address : (order.deliveryMethod === '自取' ? '店取：' + storeAddress : '')}\n--------------------\n${itemsText}${extras ? '\n• 加購：' + extras : ''}${cardText}${order.taxId ? '\n• 統編：' + order.taxId : ''}${bagText}${coolerText}\n--------------------\n💰 總金額：$ ${totalAmount}\n備註：${order.note || '無'}\n\n已成功複製，回傳 LINE 即可完成預定。`;
+                const text = `【華夫格格 - 預約下單】\n客戶：${order.name}${secondaryNote}\n單位：${order.unitName || '無'}\n電話：${order.phone}\n預約時間：${order.pickupTime.replace('T', ' ')}\n配送方式：${order.deliveryMethod}\n付款方式：${order.paymentMethod}\n${order.address ? '地址：'+order.address : (order.deliveryMethod === '自取' ? '店取：' + storeAddress : '')}\n--------------------\n${itemsText}${extras ? '\n• 加購：' + extras : ''}${cardText}${order.taxId ? '\n• 統編：' + order.taxId : ''}${bagText}${coolerText}\n--------------------\n💰 總金額：$ ${totalAmount}\n備註：${order.note || '無'}\n\n已複製訂單，請回傳 LINE 並「務必截圖」此畫面給店長，謝謝您！`;
                 
                 const t = document.createElement("textarea");
                 t.value = text;
@@ -268,17 +249,16 @@
                 t.style.opacity = "0";
                 document.body.appendChild(t);
                 t.select();
-                t.setSelectionRange(0, 99999);
                 try { document.execCommand('copy'); } catch (err) {}
                 document.body.removeChild(t);
 
                 setMessage({
-                    title: "複製成功！",
-                    content: "訂單內容已存入剪貼簿。請點擊下方按鈕前往 LINE 並貼上訊息。",
+                    title: "訂單複製成功！",
+                    content: "訂單內容已存入剪貼簿。請務必「截圖」以下內容，並點擊下方按鈕前往 LINE 貼上訊息回傳給我們。",
                     isExport: true
                 });
 
-                setTimeout(() => { window.location.href = officialLineUrl; }, 1500);
+                setTimeout(() => { window.location.href = officialLineUrl; }, 3000);
             };
 
             return (
@@ -286,17 +266,20 @@
                     {message && (
                         <div className="fixed inset-0 z-[100] modal-overlay flex items-center justify-center p-6 animate-fade">
                             <div className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl p-10 space-y-6 text-center border border-[#F5EBE0]">
-                                <Icon name={message.isExport ? "check" : "info"} size={48} className={message.isExport ? "text-green-500 mx-auto" : "text-[#D5BDAF] mx-auto"} />
+                                <Icon name={message.isExport ? "camera" : "info"} size={48} className={message.isExport ? "text-blue-500 mx-auto" : "text-[#D5BDAF] mx-auto"} />
                                 <h3 className="text-xl font-black text-[#5E503F]">{message.title || "提示"}</h3>
-                                <p className="text-base font-bold text-gray-500 leading-relaxed">{message.content || message}</p>
+                                <div className="space-y-3">
+                                    <p className="text-base font-bold text-gray-500 leading-relaxed">{message.content || message}</p>
+                                    {message.isExport && <p className="text-sm font-black text-red-500 bg-red-50 py-2 rounded-xl border border-red-100">⚠️ 提醒：剛才沒截圖到的話，請一定要點擊 LINE 並貼上傳送喔！</p>}
+                                </div>
                                 <div className="pt-2 flex flex-col gap-3">
                                     {message.isExport && (
                                         <a href={officialLineUrl} className="w-full bg-[#06C755] text-white py-4 rounded-2xl font-black text-base shadow-md flex items-center justify-center gap-2 btn-active">
-                                            手動開啟 LINE
+                                            前往回傳 LINE
                                         </a>
                                     )}
                                     <button onClick={() => {setMessage(null); if(message.isExport) setShowConfirm(false);}} className="w-full bg-[#F9F6F4] text-[#8E7D6F] py-4 rounded-2xl font-black text-base btn-active">
-                                        {message.isExport ? "完成並關閉" : "確定"}
+                                        {message.isExport ? "好的，我已完成" : "確定"}
                                     </button>
                                 </div>
                             </div>
@@ -318,7 +301,7 @@
                                         <p className="text-xs font-black text-[#D5BDAF] uppercase tracking-widest flex items-center gap-2"><Icon name="calendar" size={14}/> 選擇日期</p>
                                         <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                                             {dateOptions.map(d => (
-                                                <button key={d.fullDate} onClick={() => setSelectedDate(d.fullDate)} className={`flex-shrink-0 w-20 py-4 rounded-3xl flex flex-col items-center justify-center transition-all border-2 ${selectedDate === d.fullDate ? 'bg-[#8E7D6F] border-[#8E7D6F] text-white' : 'bg-white border-[#FDF8F5] text-[#8E7D6F]'}`}>
+                                                <button key={d.fullDate} onClick={() => setSelectedDate(d.fullDate)} className={`flex-shrink-0 w-20 py-4 rounded-3xl flex flex-col items-center justify-center transition-all border-2 ${selectedDate === d.fullDate ? 'bg-[#8E7D6F] border-[#8E7D6F] text-white shadow-lg' : 'bg-white border-[#FDF8F5] text-[#8E7D6F]'}`}>
                                                     <span className="text-[10px] font-black mb-1">週{d.weekday}</span>
                                                     <span className="text-lg font-black">{d.label}</span>
                                                 </button>
@@ -350,14 +333,30 @@
                             <div className="bg-red-50 border-2 border-red-200 p-6 rounded-3xl flex items-center gap-5 warning-pulse animate-fade shadow-sm">
                                 <Icon name="alert" size={32} className="text-red-500 flex-shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-lg font-black text-red-600">訂購盒數不足</p>
-                                    <p className="text-base font-bold text-red-500 opacity-90">雙色4入與綜合系列共需滿 20 盒 (目前僅 {limitItemsQty} 盒)。</p>
+                                    <p className="text-lg font-black text-red-600">訂購數量不足</p>
+                                    <p className="text-base font-bold text-red-500 opacity-90">雙色4入與綜合系列需滿 20 盒。若此為您的續單請勾選下方「續單」選項。</p>
                                 </div>
                             </div>
                         )}
 
                         <section className="bg-white rounded-[3rem] p-10 shadow-md space-y-8 border border-[#F5EBE0]">
                             <h2 className="font-black text-[#8E7D6F] flex items-center gap-3 text-xl border-b border-[#FDF8F5] pb-4">❶ 客戶基本資料</h2>
+                            
+                            {/* 合併續單勾選功能 */}
+                            <div 
+                                onClick={() => setOrder({...order, isSecondaryOrder: !order.isSecondaryOrder})}
+                                className={`p-6 rounded-[2rem] border-2 transition-all cursor-pointer flex items-center justify-between ${order.isSecondaryOrder ? 'bg-[#8E7D6F] border-[#8E7D6F] text-white shadow-lg' : 'bg-[#FDF8F5] border-dashed border-[#D5BDAF] text-[#8E7D6F]'}`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <Icon name="link" size={24}/>
+                                    <div>
+                                        <p className="text-lg font-black">我是續單（合併計算盒數）</p>
+                                        <p className={`text-[11px] font-bold ${order.isSecondaryOrder ? 'text-white/80' : 'text-[#D5BDAF]'}`}>若您因多個地址分開下單，勾選此項可解除 20 盒限制。</p>
+                                    </div>
+                                </div>
+                                {order.isSecondaryOrder && <Icon name="check" size={24}/>}
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-3">
                                     <p className="text-sm font-black text-[#8E7D6F] uppercase">姓名 <span className="text-red-400">*</span></p>
@@ -430,10 +429,10 @@
                                     <p className="text-sm font-black text-[#D5BDAF] mb-2 uppercase tracking-widest">🛒 已選擇購物清單 (手動輸入數量)</p>
                                     <div className="grid grid-cols-1 gap-3">
                                         {order.items.map(i => (
-                                            <div key={i.id} className="flex justify-between items-center text-lg font-black bg-[#FDF8F5] p-5 rounded-3xl border border-[#F5EBE0] shadow-sm">
+                                            <div key={i.id} className="flex justify-between items-center text-lg font-black bg-[#FDF8F5] p-5 rounded-3xl border border-[#F5EBE0] shadow-sm text-left">
                                                 <div className="flex-1">
                                                     <span className="block">{i.label}</span>
-                                                    {i.note && <span className="text-[10px] text-orange-400 font-bold">客製化預定項</span>}
+                                                    {i.minLimit && <span className="text-[10px] text-orange-400 font-bold">客製化預定項</span>}
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     <button onClick={() => handleUpdateQty(i.id, i.qty - 1)} className="bg-white text-[#D5BDAF] p-3 rounded-xl shadow-sm border border-[#F5EBE0] active:scale-110"><Icon name="minus" size={20}/></button>
@@ -443,17 +442,12 @@
                                             </div>
                                         ))}
                                     </div>
-
-                                    {/* 智慧袋子建議區 - 當有品項時顯示 */}
                                     {order.extras.bag && (packing.b6 > 0 || packing.b4 > 0) && (
                                         <div className="bg-[#D5BDAF]/10 border-2 border-dashed border-[#D5BDAF] p-6 rounded-[2rem] mt-6 animate-fade shadow-inner">
-                                            <p className="text-sm font-black text-[#8E7D6F] flex items-center gap-2 uppercase mb-3 tracking-widest">
-                                                <Icon name="truck" size={16}/> 智慧包裝提袋建議
-                                            </p>
+                                            <p className="text-sm font-black text-[#8E7D6F] flex items-center gap-2 uppercase mb-3 tracking-widest"><Icon name="truck" size={16}/> 智慧提袋建議</p>
                                             <div className="space-y-2">
                                                 {packing.b6 > 0 && <div className="flex justify-between text-base font-black"><span>專用 6 杯袋 ($2)</span><span>x {packing.b6} 個</span></div>}
                                                 {packing.b4 > 0 && <div className="flex justify-between text-base font-black"><span>專用 4 杯袋 ($2)</span><span>x {packing.b4} 個</span></div>}
-                                                <div className="text-[10px] text-[#8E7D6F] opacity-70 mt-2 font-bold leading-tight">* 根據點購產品大小自動換算，確保包裝精準。</div>
                                             </div>
                                         </div>
                                     )}
@@ -509,30 +503,27 @@
                             <div className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl border border-[#F5EBE0]">
                                 <div className="p-12 space-y-10 max-h-[85vh] overflow-y-auto no-scrollbar">
                                     <div className="text-center">
-                                        <h3 className="text-3xl font-black text-[#8E7D6F]">預約清單核對</h3>
+                                        <h3 className="text-3xl font-black text-[#8E7D6F] tracking-widest">預約清單核對</h3>
                                         <p className="text-sm opacity-40 mt-1 uppercase tracking-[0.2em] font-black">Final Confirmation</p>
                                     </div>
                                     <div className="space-y-4 text-base font-bold border-y border-dashed border-[#D5BDAF]/30 py-8 text-left">
-                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">客戶姓名</span><span className="text-lg">{order.name}</span></div>
+                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">客戶姓名</span><span>{order.name}{order.isSecondaryOrder && <span className="ml-2 text-red-500 font-black">(續單)</span>}</span></div>
                                         <div className="flex justify-between items-center"><span className="opacity-50 font-black">預約時間</span><span className="text-[#8E7D6F] font-black text-lg">{order.pickupTime.replace('T',' ')}</span></div>
-                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">裝飾小卡</span><span>{cardNames[order.cardType]}</span></div>
-                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">配送方式</span><span className="text-lg">{order.deliveryMethod}</span></div>
-                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black">付款方式</span><span className="text-blue-500 font-black underline underline-offset-8 text-lg">{order.paymentMethod}</span></div>
+                                        <div className="flex justify-between items-center"><span className="opacity-50 font-black font-black">付款方式</span><span className="text-blue-500 font-black underline underline-offset-8 text-lg">{order.paymentMethod}</span></div>
                                         <div className="text-sm opacity-60 text-right mt-4 bg-[#F9F6F4] p-5 rounded-3xl italic border border-[#F5EBE0]">📍 {order.deliveryMethod === '自取' ? storeAddress : order.address}</div>
                                     </div>
                                     <div className="space-y-6">
-                                        <p className="text-sm font-black text-[#D5BDAF] uppercase tracking-widest border-l-4 border-[#D5BDAF] pl-3">訂購明細內容</p>
-                                        <div className="space-y-5">
+                                        <p className="text-sm font-black text-[#D5BDAF] uppercase tracking-widest border-l-4 border-[#D5BDAF] pl-3">訂購內容明細</p>
+                                        <div className="space-y-5 text-left">
                                             {order.items.map(i => (
                                                 <div key={i.id} className="flex justify-between text-xl font-black">
                                                     <div className="flex flex-col">
                                                         <span>• {i.label} x {i.qty}</span>
-                                                        {i.note && <span className="text-sm text-orange-400 font-bold italic mt-1 bg-orange-50 px-2 py-0.5 rounded-lg inline-block self-start">({i.note})</span>}
+                                                        {i.minLimit && <span className="text-sm text-orange-400 font-bold italic mt-1 bg-orange-50 px-2 py-0.5 rounded-lg inline-block self-start">({i.note})</span>}
                                                     </div>
                                                     <span>$ {i.price * i.qty}</span>
                                                 </div>
                                             ))}
-                                            {/* 核對清單顯示提袋資訊 */}
                                             {order.extras.bag && (packing.b6 > 0 || packing.b4 > 0) && (
                                                 <div className="space-y-2 pt-2 border-t border-[#F5EBE0]">
                                                     {packing.b6 > 0 && <div className="flex justify-between text-lg font-black text-gray-500"><span>• 專用 6 杯袋 x {packing.b6}</span><span>$ {packing.b6 * 2}</span></div>}
@@ -541,7 +532,7 @@
                                             )}
                                         </div>
                                         {packing.cooler > 0 && (
-                                            <div className="bg-blue-50 text-blue-600 p-6 rounded-3xl text-base font-black border border-blue-100 italic flex items-center gap-3 shadow-inner"><Icon name="check" size={20}/> 真空包福利：已贈送保冷袋 x {packing.cooler}</div>
+                                            <div className="bg-blue-50 text-blue-600 p-6 rounded-3xl text-base font-black border border-blue-100 italic flex items-center gap-3 shadow-inner text-left"><Icon name="check" size={20}/> 真空包福利：已贈送保冷袋 x {packing.cooler}</div>
                                         )}
                                     </div>
                                     {(order.paymentMethod === '匯款' || order.paymentMethod === 'LinePay') && (
@@ -549,20 +540,24 @@
                                             <p className="text-sm font-black text-[#8E7D6F] uppercase border-b border-[#D5BDAF]/20 pb-2 tracking-widest">付款與對帳資訊</p>
                                             {order.paymentMethod === '匯款' ? (
                                                 <div className="text-base font-bold space-y-3 text-center">
-                                                    <div className="flex justify-between text-sm opacity-60 px-4"><span>銀行</span><span>{bankInfo.bankName}</span></div>
-                                                    <div className="flex justify-between text-sm opacity-60 px-4"><span>戶名</span><span>{bankInfo.accountName}</span></div>
                                                     <p className="text-3xl tracking-tighter font-black text-[#8E7D6F] py-5 bg-white rounded-3xl border border-[#F5EBE0] shadow-sm my-4">{bankInfo.accountNumber}</p>
                                                     <div className="text-sm text-red-500 font-black bg-red-50 p-5 rounded-3xl border border-red-100 text-left">⚠️ 匯款完畢後，請回傳「帳號後五碼」以確認付款。</div>
                                                 </div>
                                             ) : (
-                                                <p className="text-lg font-black text-[#8E7D6F] text-center py-4">LinePay 付款：下單後請於 LINE 索取付款連結。</p>
+                                                <p className="text-lg font-black text-[#8E7D6F] text-center py-4 font-black">LinePay 付款：下單後請於 LINE 索取付款連結。</p>
                                             )}
                                         </div>
                                     )}
+                                    {/* 最終提醒圖塊 */}
+                                    <div className="bg-blue-50 p-6 rounded-3xl border-2 border-blue-200 text-blue-600 space-y-2 text-center animate-fade">
+                                        <Icon name="camera" size={32} className="mx-auto mb-1" />
+                                        <p className="text-lg font-black">💡 貼心提醒</p>
+                                        <p className="text-sm font-bold">點擊按鈕後將自動複製訂單明細，<br/><span className="text-red-500 underline">請務必將此頁面「截圖」</span><br/>連同訊息一起傳送給官方 LINE 喔！</p>
+                                    </div>
                                 </div>
                                 <div className="p-8 bg-[#F9F6F4] flex gap-4 border-t border-[#F5EBE0]">
-                                    <button onClick={() => setShowConfirm(false)} className="flex-1 py-6 bg-white rounded-3xl font-black text-[#D5BDAF] border border-[#D5BDAF] text-lg btn-active transition-all">返回</button>
-                                    <button onClick={handleCopyAndSubmit} className="flex-[2] py-6 bg-[#8E7D6F] text-white rounded-3xl font-black shadow-lg flex items-center justify-center gap-4 text-xl btn-active transition-all"><Icon name="copy" size={24}/> 複製並回傳 LINE</button>
+                                    <button onClick={() => setShowConfirm(false)} className="flex-1 py-6 bg-white rounded-3xl font-black text-[#D5BDAF] border border-[#D5BDAF] text-lg btn-active shadow-sm transition-all hover:bg-gray-50">返回修改</button>
+                                    <button onClick={handleCopyAndSubmit} className="flex-[2] py-6 bg-[#8E7D6F] text-white rounded-3xl font-black shadow-lg flex items-center justify-center gap-4 text-xl btn-active transition-all"><Icon name="copy" size={24}/> 複製內容並開啟 LINE</button>
                                 </div>
                             </div>
                         </div>
